@@ -1,0 +1,128 @@
+$date
+	Thu May 21 05:57:35 2026
+$end
+$version
+	Icarus Verilog
+$end
+$timescale
+	1ps
+$end
+$scope module input_mapper_tb $end
+$var wire 1 ! pkt_valid $end
+$var reg 2 " bumpers [1:0] $end
+$var reg 1 # clk $end
+$var reg 4 $ dpad [3:0] $end
+$var reg 4 % face_btn [3:0] $end
+$var reg 1 & poll_tick $end
+$var reg 1 ' rst_n $end
+$var reg 1 ( select_btn $end
+$var reg 1 ) start_btn $end
+$var reg 8 * tp_data_1 [7:0] $end
+$var reg 8 + tp_data_2 [7:0] $end
+$scope module dut $end
+$var wire 2 , bumpers [1:0] $end
+$var wire 1 # clk $end
+$var wire 4 - dpad [3:0] $end
+$var wire 4 . face_btn [3:0] $end
+$var wire 1 ! pkt_valid $end
+$var wire 1 & poll_tick $end
+$var wire 1 ' rst_n $end
+$var wire 1 ( select_btn $end
+$var wire 1 ) start_btn $end
+$var wire 8 / tp_data_1 [7:0] $end
+$var wire 8 0 tp_data_2 [7:0] $end
+$var parameter 8 1 SYNC $end
+$upscope $end
+$scope task check_byte $end
+$var reg 8 2 expected [7:0] $end
+$var reg 8 3 got [7:0] $end
+$var reg 48 4 label [47:0] $end
+$upscope $end
+$upscope $end
+$enddefinitions $end
+$comment Show the parameter values. $end
+$dumpall
+b10101010 1
+$end
+#0
+$dumpvars
+bx 4
+bx 3
+bx 2
+b0 0
+b0 /
+b0 .
+b0 -
+b0 ,
+b0 +
+b0 *
+0)
+0(
+0'
+0&
+b0 %
+b0 $
+0#
+b0 "
+0!
+$end
+#10000
+1#
+#20000
+0#
+#30000
+1#
+#40000
+0#
+#50000
+1#
+#60000
+0#
+#70000
+1'
+1#
+#80000
+0#
+#90000
+1#
+#100000
+0#
+#110000
+1#
+#111000
+b10101101 +
+b10101101 0
+b11011110 *
+b11011110 /
+1)
+b10 "
+b10 ,
+b101 $
+b101 -
+b1010 %
+b1010 .
+b11100000110101101110100010110110011010001011101 4
+b0 2
+b0 3
+#112000
+b11100000110101101110100010110110011010001011101 4
+b10101101 2
+b10101101 3
+#120000
+0#
+#130000
+1!
+1&
+1#
+#140000
+0#
+#150000
+1#
+#151000
+0!
+0&
+#160000
+0#
+#170000
+1#
+#171000
