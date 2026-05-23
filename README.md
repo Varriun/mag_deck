@@ -1,1 +1,1 @@
-# magdeck
+# mag deck
