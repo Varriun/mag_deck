@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(iverilog -g2012 -o core_sim.vvp testBenches/core_boot_tb.sv unit/mag_deck_core.sv unit/debounce.sv unit/i2c_master.sv unit/input_mapper.sv unit/tx_encoder.sv unit/uart_tx.sv)",
-      "Bash(vvp core_sim.vvp)"
-    ]
-  }
-}
