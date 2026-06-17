@@ -190,8 +190,8 @@ module mag_deck_core (
   
   always_ff @(posedge clk or negedge rst_n) begin
       if(!rst_n)     begin
-       tp_data_1 <= 1'b0;
-       tp_data_2 <= 1'b0;
+       tp_data_1 <= '0;
+       tp_data_2 <= '0;
       end else begin
         if(rx_valid_1) tp_data_1 <= rx_data_1;
         if(rx_valid_2) tp_data_2 <= rx_data_2;
