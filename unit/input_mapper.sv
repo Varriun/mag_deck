@@ -11,6 +11,7 @@ module input_mapper (
   input  logic        select_btn,
   input  logic [7:0]  tp_data_1,
   input  logic [7:0]  tp_data_2,
+  input  logic [1:0]  triggers,
 
   // 100 Hz strobe from the poll timer — your trigger to emit a new packet
   input  logic        poll_tick,
@@ -45,10 +46,15 @@ module input_mapper (
 
   always_comb begin
     pkt[0] = SYNC;
-    pkt[1] = {4'b0000, start_btn, select_btn, bumpers[1:0]};
+    //NOTE:   8                                                            = 8
+    pkt[1] = {4'b0000, triggers[1:0] ,start_btn, select_btn, bumpers[1:0]};
+    //NOTE:     2    +       2       +     1   +     1     +      2        = 8
     pkt[2] = {face_btn[3:0],dpad[3:0]};
+    //NOTE:       4        +    4                                          = 8
     pkt[3] = tp_data_1[7:0];
+    //NOTE:          8                                                     = 8
     pkt[4] = tp_data_2[7:0];
+    //NOTE:          8                                                     = 8
   end
 
   // ── pkt_valid strobe ─────────────────────────────────────────────────────

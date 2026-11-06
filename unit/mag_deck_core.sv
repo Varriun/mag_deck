@@ -9,6 +9,7 @@ module mag_deck_core (
   input logic [1:0] bumpers,    // L1,R1
   input logic start_btn,
   input logic select_btn,
+  input logic [1:0] triggers,   // L2,R2
 
   // Analog Trackpad Interface (external ADC)
   // 1st Trackpad Interface (I2C)
@@ -30,6 +31,7 @@ module mag_deck_core (
   logic [1:0] clean_bumper;
   logic       clean_start_btn;
   logic       clean_select_btn;
+  logic [1:0] clean_trigger;
 
   // Note: analog sticks are not debounced — ADC outputs are
   // already filtered upstream and change continuously.
@@ -64,7 +66,15 @@ module mag_deck_core (
       .sw_out(clean_bumper[i])
     );
   end
-
+    // triggers[1:0] — 2 instances (L2, R2)
+  for (genvar i = 0; i < 2; i++) begin : gen_trigger_db
+    debounce #(.THRESHOLD(50000)) db_trigger (
+      .clk   (clk),
+      .rst_n (rst_n),
+      .sw_in (triggers[i]),
+      .sw_out(clean_trigger[i])
+    );
+  end
   // start_btn — single instance
   debounce #(.THRESHOLD(50000)) db_start (
     .clk   (clk),
@@ -85,6 +95,7 @@ module mag_deck_core (
   logic [3:0]  reg_face_btn;
   logic [3:0]  reg_dpad;
   logic [1:0]  reg_bumper;
+  logic [1:0]  reg_trigger;
   logic        reg_start_btn;
   logic        reg_select_btn;
   logic        poll_tick;
@@ -130,6 +141,7 @@ module mag_deck_core (
     .bumpers    (reg_bumper),
     .start_btn  (reg_start_btn),
     .select_btn (reg_select_btn),
+    .triggers   (reg_trigger),
     .tp_data_1  (tp_data_1),
     .tp_data_2  (tp_data_2),
     .poll_tick  (poll_tick),
@@ -161,6 +173,7 @@ module mag_deck_core (
       reg_bumper        <= 2'b0;
       reg_start_btn     <= 1'b0;
       reg_select_btn    <= 1'b0;
+      reg_trigger       <= 2'b0;
     end else begin
       // Latch debounced digital inputs
       reg_face_btn   <= clean_face_btn;
@@ -168,6 +181,7 @@ module mag_deck_core (
       reg_bumper     <= clean_bumper;
       reg_start_btn  <= clean_start_btn;
       reg_select_btn <= clean_select_btn;
+      reg_trigger    <= clean_trigger;
     end
   end
   // ── Parallel logic: I2C polling section ───────────────────────────────────────────

@@ -21,7 +21,7 @@
 //
 // WHAT TO LOOK FOR IN GTKWAVE:
 //   pkt[0]     — should always be 0xAA
-//   pkt[1]     — spare[3:0] | start | select | bumpers[1:0]
+//   pkt[1]     — spare[1:0] | triggers[1:0] | start | select | bumpers[1:0]
 //   pkt[2]     — face_btn[3:0] | dpad[3:0]
 //   pkt[3/4]   — raw trackpad bytes
 //   pkt_valid  — one-cycle pulse aligned with poll_tick
@@ -37,6 +37,7 @@ module input_mapper_tb();
   logic [1:0] bumpers    = 2'b0;
   logic       start_btn  = 1'b0;
   logic       select_btn = 1'b0;
+  logic [1:0] triggers   = 2'b00;
   logic [7:0] tp_data_1  = 8'h00;
   logic [7:0] tp_data_2  = 8'h00;
   logic       poll_tick  = 1'b0;
@@ -54,6 +55,7 @@ module input_mapper_tb();
     .bumpers    (bumpers),
     .start_btn  (start_btn),
     .select_btn (select_btn),
+    .triggers   (triggers),
     .tp_data_1  (tp_data_1),
     .tp_data_2  (tp_data_2),
     .poll_tick  (poll_tick),
@@ -95,11 +97,12 @@ module input_mapper_tb();
     //   face_btn  = 4'b1010  (A and X pressed)
     //   dpad      = 4'b0101  (down and right)
     //   bumpers   = 2'b10    (L1 pressed, R1 not)
+    //   triggers  = 2'b10    (triggers[1] pressed, triggers[0] not)
     //   start_btn = 1,  select_btn = 0
     //   tp_data_1 = 0xDE,  tp_data_2 = 0xAD
     //
     // Work out the expected bytes yourself before looking at the checks:
-    //   pkt[1] = {4'b0000, start, select, bumpers} = ?
+    //   pkt[1] = {2'b00, triggers, start, select, bumpers} = ?
     //   pkt[2] = {face_btn, dpad}                  = ?
 
     face_btn   = 4'b1010;
@@ -107,16 +110,25 @@ module input_mapper_tb();
     bumpers    = 2'b10;
     start_btn  = 1'b1;
     select_btn = 1'b0;
+    triggers   = 2'b10;
     tp_data_1  = 8'hDE;
     tp_data_2  = 8'hAD;
     #1;
 
     $display("\n── Check 2: known pattern ──");
     check_byte(pkt[0], 8'hAA, "pkt[0]");  // sync never changes
-    check_byte(pkt[1], 8'h0A, "pkt[1]");  // 0000 | 1 | 0 | 10  = 0x0A
+    check_byte(pkt[1], 8'h2A, "pkt[1]");  // 00 | 10 | 1 | 0 | 10  = 0x2A
     check_byte(pkt[2], 8'hA5, "pkt[2]");  // 1010 | 0101        = 0xA5
     check_byte(pkt[3], 8'hDE, "pkt[3]");
     check_byte(pkt[4], 8'hAD, "pkt[4]");
+
+    // ── Check 2b: other trigger bit ───────────────────────────────────────
+    // Flip which trigger is pressed. Together with Check 2 this proves each
+    // trigger lands in its own bit — a swapped L2/R2 order would fail here.
+    triggers = 2'b01;
+    #1;
+    $display("\n── Check 2b: triggers = 01 ──");
+    check_byte(pkt[1], 8'h1A, "pkt[1]");  // 00 | 01 | 1 | 0 | 10  = 0x1A
 
     // ── Check 3: pkt_valid strobe ─────────────────────────────────────────
     // Assert poll_tick for exactly one clock cycle.

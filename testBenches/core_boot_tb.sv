@@ -43,6 +43,7 @@ module core_boot_tb();
   logic [1:0] bumpers    = 2'b00;
   logic       start_btn  = 1'b0;
   logic       select_btn = 1'b0;
+  logic [1:0] triggers   = 2'b00;
 
   // ── I2C ───────────────────────────────────────────────────────────────────
   // pullup models the physical pull-up resistors on the I2C bus.
@@ -64,6 +65,7 @@ module core_boot_tb();
     .bumpers    (bumpers),
     .start_btn  (start_btn),
     .select_btn (select_btn),
+    .triggers   (triggers),
     .i2c_scl_1  (i2c_scl_1),
     .i2c_sda_1  (i2c_sda_1),
     .i2c_scl_2  (i2c_scl_2),
@@ -133,7 +135,7 @@ module core_boot_tb();
     // ── PHASE 2: Bounce then stable inputs ───────────────────────────────
     // Bounce on face_btn[1]; stable inputs settle on face_btn[0] + others.
     // Expected packet values:
-    //   pkt[1] = {4'b0, start=1, select=0, bumpers=01} = 0x09
+    //   pkt[1] = {2'b0, triggers=01, start=1, select=0, bumpers=01} = 0x19
     //   pkt[2] = {face_btn=0001, dpad=0001}             = 0x11
     $display("\n── PHASE 2: Bounce + stable inputs ──");
     @(posedge clk); face_btn[1] = 1'b1;
@@ -145,7 +147,8 @@ module core_boot_tb();
     dpad      = 4'b0001;
     bumpers   = 2'b01;
     start_btn = 1'b1;
-    $display("  Inputs: face=0001 dpad=0001 bumpers=01 start=1");
+    triggers  = 2'b01;
+    $display("  Inputs: face=0001 dpad=0001 bumpers=01 start=1 triggers=01");
 
     // ── PHASE 3: Debounce settle ──────────────────────────────────────────
     $display("\n── PHASE 3: Debounce settle ──");
@@ -173,11 +176,11 @@ module core_boot_tb();
     capture_uart_byte(byte_cap);
     check_byte(byte_cap, 8'hAA, "byte[0] sync");
 
-    // ── PHASE 6: UART byte 1 — buttons (0x09) ────────────────────────────
+    // ── PHASE 6: UART byte 1 — buttons (0x19) ────────────────────────────
     $display("\n── PHASE 6: UART byte 1 (buttons) ──");
     @(negedge tx_pin);
     capture_uart_byte(byte_cap);
-    check_byte(byte_cap, 8'h09, "byte[1] btns");
+    check_byte(byte_cap, 8'h19, "byte[1] btns");
 
     // ── PHASE 7: UART byte 2 — face + dpad (0x11) ────────────────────────
     $display("\n── PHASE 7: UART byte 2 (face+dpad) ──");
