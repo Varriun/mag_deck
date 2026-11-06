@@ -36,7 +36,7 @@ always_ff @(posedge clk or negedge rst_n) begin
            state    <= DATA;
            baud_cnt <= 1'b0;
          end else begin
-           baud_cnt++;
+           baud_cnt <= baud_cnt   + 1;
          end
         end
         DATA: begin
@@ -47,10 +47,10 @@ always_ff @(posedge clk or negedge rst_n) begin
               state    <= STOP;
               bit_cnt  <= 1'b0; 
             end else begin
-              bit_cnt++;
+              bit_cnt  <= bit_cnt + 1;
             end
           end else begin
-            baud_cnt++;
+           baud_cnt <= baud_cnt   + 1;
           end
         end
         STOP: begin
@@ -60,7 +60,7 @@ always_ff @(posedge clk or negedge rst_n) begin
             tx_busy  <= 1'b0;
             state    <= IDLE;
           end else begin
-            baud_cnt++;
+           baud_cnt <= baud_cnt   + 1;
           end
         end
         default : begin

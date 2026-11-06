@@ -48,7 +48,7 @@ module input_mapper (
     pkt[0] = SYNC;
     //NOTE:   8                                                            = 8
     pkt[1] = {2'b00, triggers[1:0] ,start_btn, select_btn, bumpers[1:0]};
-    //NOTE:     2    +       2       +     1   +     1     +      2        = 8
+    //NOTE:   2    +       2       +     1   +     1     +      2          = 8
     pkt[2] = {face_btn[3:0],dpad[3:0]};
     //NOTE:       4        +    4                                          = 8
     pkt[3] = tp_data_1[7:0];
