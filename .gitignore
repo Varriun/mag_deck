@@ -1,0 +1,16 @@
+# Simulation output
+*.vcd
+*.vvp
+*.fst
+# Tool/agent local settings
+.claude/
+# Altium generated
+History/
+Project Logs for */
+__Previews/
+*.PcbDoc.htm
+# FreeCAD / office backups and locks
+*.FCBak
+*.FCStd1
+.~lock*
+~$*

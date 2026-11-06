@@ -1,0 +1,337 @@
+# MCON + Fold8 offset-plate mockup  (FreeCAD 1.x macro)  -- rev 7
+#
+# Rev 7: silicone pad pockets. Top: one full-face pocket inside a rim
+#        (ring sits flush with the pocket floor). Bottom: four pad pockets,
+#        two each side of the T-slot, like the stock puck.
+#
+# The printed part is a FLAT pill-shaped plate (a re-designed stock puck):
+#   - top face flat, harvested MagSafe ring flush in a pocket
+#   - camera-bump clearance window where the bump crosses the plate
+#   - T-slot recess on the underside that slides onto the controller's
+#     centered grip nub; "fully inserted" = nub against the slot's closed end
+# The ring sits (mount_dx, mount_dy) away from the nub so the folded phone
+# lands centered on the controller. The phone/case, controller and stock puck
+# are reference geometry only - only "Plate" gets printed.
+#
+# All dimensions live in the "params" spreadsheet: edit, Enter, Ctrl+R.
+#
+# FRAME
+#   Controller closed, top up. x = along its length (= rail axis),
+#   y = across its width (= deploy slide axis), z = up. Origin: controller corner.
+#   Phone lies landscape: length along x (USB-C end at x = 0 side),
+#   HINGE EDGE toward y = 0. Plate rests directly on the controller top.
+#
+# OUTPUTS (derived section of the sheet)
+#   mount_dx, mount_dy : nub center relative to ring center (centered phone)
+#   floor_margin       : material between ring pocket (top) and T-slot
+#                        (bottom). Keep >= ~0.8 mm.
+#   cam_overlap_x      : > 0 means the camera bump crosses the plate along x,
+#                        so the camera window is actually cutting material.
+#   stk_shift_x/y      : predicted off-center with the stock puck.
+
+import FreeCAD as App
+
+doc = App.newDocument("MCON_Fold8_Mockup")
+
+P = [
+    # ---- controller (closed) ----
+    ("ctrl_L",    144.0, "tape. spec 144.1"),
+    ("ctrl_W",     79.5, "tape 79-80. spec says 69.4 - recheck"),
+    ("ctrl_T",     20.0, "tape, without puck"),
+    # ---- grip nub on controller (T-shape), centered ----
+    ("nub_L",       7.0, "nub length along x - CALIPERS"),
+    ("nub_neck_w",  8.0, "MEASURE neck width (y) - placeholder"),
+    ("nub_cap_w",  10.0, "MEASURE cap width (y) - placeholder"),
+    ("nub_neck_h",  1.0, "MEASURE neck height - placeholder"),
+    ("nub_cap_h",   1.0, "MEASURE cap height - placeholder"),
+    ("slot_clr",    0.2, "T-slot clearance per side"),
+    ("slot_dir",   -1.0, "+1: slot opens to the plate's +x end, -1: to -x"),
+    ("slot_over",   0.0, "extra slot past the centered stop, for tuning (0 = hard stop)"),
+    # ---- the printed plate (flat pill) ----
+    ("pl_L",       87.0, "plate length along x (default = stock puck)"),
+    ("pl_W",       62.0, "plate width along y (default = stock puck); pl_L > pl_W"),
+    ("pl_dx",       0.0, "plate center offset from ring center, x"),
+    ("pl_dy",       0.0, "plate center offset from ring center, y"),
+    ("plate_t",     5.5, "plate thickness - must fit top pad + ring pocket + T-slot"),
+    ("ring_clr",    0.2, "ring pocket clearance (radial)"),
+    ("cam_clr",     1.0, "camera window clearance"),
+    # ---- silicone pad pockets ----
+    ("top_pad_d",   0.5, "top pad pocket depth; silicone ~0.2-0.3 thicker = stands proud"),
+    ("top_rim",     1.5, "rim width around the top pad pocket"),
+    ("bot_pad_d",   0.8, "bottom pad pocket depth; pads must NOT stand proud (see notes)"),
+    ("bp_L",       30.0, "bottom pad length along x (bp_L > bp_W)"),
+    ("bp_W",       12.0, "bottom pad width along y"),
+    ("bp_gap",      2.0, "gap from T-slot chamber edge to pad"),
+    ("bp_sep",      6.0, "gap between the two pads on one side"),
+    # ---- stock puck (reference) ----
+    ("pk_L",       87.0, "pill length, along x"),
+    ("pk_W",       62.0, "pill width, along y"),
+    ("pk_rx",      30.0, "ring center from pill end (see pk_flip)"),
+    ("pk_flip",     1.0, "1 = pill mirrored in x about its ring, 0 = original"),
+    ("pk_ry",      30.0, "ring center from pill -y edge"),
+    ("pk_t",        5.0, "MEASURE puck thickness - placeholder"),
+    ("pk_off",     15.0, "stock ring offset from nub center, fully inserted"),
+    ("pk_dir",      1.0, "+1 / -1: side of that offset"),
+    # ---- phone in Spigen case, folded (reference) ----
+    ("case_L",    139.0, "tape - VERIFY (flat-face method)"),
+    ("case_W",     95.0, "tape - VERIFY. bare phone spec 81.9"),
+    ("case_T",     27.0, "SUSPECT: bare spec 9.7. re-measure"),
+    ("ring_x",     55.0, "MagFit center from USB-C end - VERIFY (sum check)"),
+    ("ring_y",     43.0, "MagFit center from hinge edge"),
+    ("cam_a0",     17.0, "camera start along LENGTH, from TOP (assumed far from USB-C)"),
+    ("cam_a1",     51.5, "camera end along LENGTH, from TOP"),
+    ("cam_b0",     18.0, "camera start across WIDTH, from LEFT (assumed hinge edge)"),
+    ("cam_b1",     31.0, "camera end across WIDTH, from LEFT"),
+    ("cam_h",       2.0, "MEASURE bump protrusion - placeholder"),
+    # ---- harvested ring ----
+    ("ring_od",    54.0, "tape"),
+    ("ring_id",    49.0, "tape"),
+    ("ring_t",      2.0, "tape"),
+    # ---- deploy sweep (slide along y, tilt about x) ----
+    ("slide",       0.0, "slide travel along y (mm)"),
+    ("tilt",        0.0, "tilt (deg); flip sign if it goes the wrong way"),
+    ("pivot_y",     0.0, "MEASURE tilt pivot y"),
+    ("pivot_z",    20.0, "MEASURE tilt pivot z"),
+]
+
+DERIVED = [
+    ("cam_x",   "=case_L - cam_a1"),
+    ("cam_Lx",  "=cam_a1 - cam_a0"),
+    ("cam_y",   "=cam_b0"),
+    ("cam_Wy",  "=cam_b1 - cam_b0"),
+    # assembly: local origin = case corner on the plate top plane
+    ("asm_x",   "=ctrl_L / 2 - case_L / 2"),
+    ("asm_y",   "=ctrl_W / 2 - case_W / 2"),
+    ("asm_z",   "=ctrl_T"),
+    ("ring_cx", "=asm_x + ring_x"),
+    ("ring_cy", "=asm_y + ring_y"),
+    ("mount_dx", "=ctrl_L / 2 - ring_cx"),
+    ("mount_dy", "=ctrl_W / 2 - ring_cy"),
+    ("rcv_x",   "=ring_x + mount_dx"),
+    ("rcv_y",   "=ring_y + mount_dy"),
+    # plate footprint (local)
+    ("pl_x0",   "=ring_x + pl_dx - pl_L / 2"),
+    ("pl_y0",   "=ring_y + pl_dy - pl_W / 2"),
+    ("pl_x1",   "=pl_x0 + pl_L"),
+    # T-slot
+    ("nub_h",   "=nub_neck_h + nub_cap_h"),
+    ("slot_d",  "=nub_h + slot_clr"),
+    ("floor_margin", "=plate_t - top_pad_d - ring_t - slot_d"),
+    ("ring_z",  "=plate_t - top_pad_d - ring_t"),
+    ("pl_cx",   "=ring_x + pl_dx"),
+    ("bp_y_hi", "=rcv_y + nub_cap_w / 2 + slot_clr + bp_gap"),
+    ("bp_y_lo", "=rcv_y - nub_cap_w / 2 - slot_clr - bp_gap - bp_W"),
+    ("bp_x_a",  "=pl_cx - bp_sep / 2 - bp_L"),
+    ("bp_x_b",  "=pl_cx + bp_sep / 2"),
+    ("bp_edge_hi", "=pl_y0 + pl_W - (bp_y_hi + bp_W)"),
+    ("bp_edge_lo", "=bp_y_lo - pl_y0"),
+    ("slot_x0",  "=slot_dir > 0 ? rcv_x - nub_L / 2 - slot_clr - slot_over : pl_x0 - 1"),
+    ("slot_len", "=slot_dir > 0 ? pl_x1 + 1 - slot_x0 : rcv_x + nub_L / 2 + slot_clr + slot_over - slot_x0"),
+    ("nub_in_plate_x", "=rcv_x - nub_L / 2 - pl_x0"),
+    ("cam_overlap_x",  "=min(pl_x1, cam_x + cam_Lx) - max(pl_x0, cam_x)"),
+    # stock puck
+    ("stk_rx",  "=ctrl_L / 2 + pk_dir * pk_off"),
+    ("stk_ry",  "=ctrl_W / 2 - pk_W / 2 + pk_ry"),
+    ("puck_x0", "=pk_flip > 0 ? stk_rx - (pk_L - pk_rx) : stk_rx - pk_rx"),
+    ("stk_shift_x", "=stk_rx - ring_cx"),
+    ("stk_shift_y", "=stk_ry - ring_cy"),
+]
+
+sheet = doc.addObject("Spreadsheet::Sheet", "params")
+row = 1
+for name, val, note in P:
+    sheet.set(f"A{row}", name)
+    sheet.set(f"B{row}", str(val))
+    sheet.setAlias(f"B{row}", name)
+    sheet.set(f"C{row}", note)
+    row += 1
+row += 1
+sheet.set(f"A{row}", "--- derived ---")
+row += 1
+for name, formula in DERIVED:
+    sheet.set(f"A{row}", name)
+    sheet.set(f"B{row}", formula)
+    sheet.setAlias(f"B{row}", name)
+    row += 1
+doc.recompute()
+
+S = "params."
+
+
+def bind(obj, exprs):
+    for prop, expr in exprs.items():
+        obj.setExpression(prop, expr)
+
+
+def box(name, L, W, H, x="0", y="0", z="0", parent=None):
+    o = doc.addObject("Part::Box", name)
+    bind(o, {"Length": L, "Width": W, "Height": H,
+             "Placement.Base.x": x, "Placement.Base.y": y,
+             "Placement.Base.z": z})
+    if parent:
+        parent.addObject(o)
+    return o
+
+
+def cyl(name, r, h, x, y, z, parent=None):
+    o = doc.addObject("Part::Cylinder", name)
+    bind(o, {"Radius": r, "Height": h,
+             "Placement.Base.x": x, "Placement.Base.y": y,
+             "Placement.Base.z": z})
+    if parent:
+        parent.addObject(o)
+    return o
+
+
+def cut(name, base, tool, parent=None):
+    o = doc.addObject("Part::Cut", name)
+    o.Base, o.Tool = base, tool
+    if parent:
+        parent.addObject(o)
+    return o
+
+
+def fuse(name, shapes, parent=None):
+    o = doc.addObject("Part::MultiFuse", name)
+    o.Shapes = shapes
+    if parent:
+        parent.addObject(o)
+    return o
+
+
+def stadium(name, L, W, H, x, y, z, parent=None):
+    """Pill with rounded ends along x. (x, y, z) = bounding-box corner.
+    Needs L > W."""
+    r = f"({W}) / 2"
+    mid = box(name + "_mid", f"({L}) - ({W})", W, H,
+              f"{x} + {r}", y, z, parent)
+    e1 = cyl(name + "_end1", r, H, f"{x} + {r}", f"{y} + {r}", z, parent)
+    e2 = cyl(name + "_end2", r, H, f"{x} + ({L}) - {r}", f"{y} + {r}", z,
+             parent)
+    return fuse(name, [mid, e1, e2], parent)
+
+
+# ---------------- controller + T-shaped grip nub (reference) ----------------
+ctrl = box("Controller", S + "ctrl_L", S + "ctrl_W", S + "ctrl_T")
+nub_xc = f"{S}ctrl_L / 2 - {S}nub_L / 2"
+neck = box("Nub_neck", S + "nub_L", S + "nub_neck_w", S + "nub_neck_h",
+           nub_xc, f"{S}ctrl_W / 2 - {S}nub_neck_w / 2", S + "ctrl_T")
+cap = box("Nub_cap", S + "nub_L", S + "nub_cap_w", S + "nub_cap_h",
+          nub_xc, f"{S}ctrl_W / 2 - {S}nub_cap_w / 2",
+          f"{S}ctrl_T + {S}nub_neck_h")
+nub = fuse("GripNub", [neck, cap])
+
+# ---------------- stock puck (reference, hidden by default) ----------------
+puck = stadium("StockPuck", S + "pk_L", S + "pk_W", S + "pk_t",
+               S + "puck_x0", f"{S}ctrl_W / 2 - {S}pk_W / 2", S + "ctrl_T")
+stk_mark = cyl("StockPuckRing", f"{S}ring_od / 2", "0.5",
+               S + "stk_rx", S + "stk_ry", f"{S}ctrl_T + {S}pk_t")
+
+# ---------------- moving assembly (slide y, tilt about x) ----------------
+deploy = doc.addObject("App::Part", "Deploy")
+deploy.Placement = App.Placement(App.Vector(0, 0, 0),
+                                 App.Rotation(App.Vector(1, 0, 0), 0))
+bind(deploy, {"Placement.Base.y": f"{S}pivot_y + {S}slide",
+              "Placement.Base.z": S + "pivot_z",
+              "Placement.Rotation.Angle": S + "tilt"})
+
+assy = doc.addObject("App::Part", "PhoneAssy")
+deploy.addObject(assy)
+bind(assy, {"Placement.Base.x": S + "asm_x",
+            "Placement.Base.y": f"{S}asm_y - {S}pivot_y",
+            "Placement.Base.z": f"{S}asm_z - {S}pivot_z"})
+
+# ---- the printed plate: flat pill, bottom at z = 0 (local) ----
+body = stadium("PlateBody", S + "pl_L", S + "pl_W", S + "plate_t",
+               S + "pl_x0", S + "pl_y0", "0", parent=assy)
+
+# annular groove for the ring (center stays solid)
+rp_out = cyl("RingPocket_out", f"{S}ring_od / 2 + {S}ring_clr",
+             f"{S}ring_t + 0.01", S + "ring_x", S + "ring_y",
+             S + "ring_z", parent=assy)
+rp_in = cyl("RingPocket_in", f"{S}ring_id / 2 - {S}ring_clr",
+            f"{S}ring_t + 1", S + "ring_x", S + "ring_y",
+            f"{S}ring_z - 0.5", parent=assy)
+ringpocket = cut("RingPocket", rp_out, rp_in, parent=assy)
+
+# top silicone pocket: full face minus a rim
+toppad = stadium("TopPadPocket", f"{S}pl_L - 2 * {S}top_rim",
+                 f"{S}pl_W - 2 * {S}top_rim", f"{S}top_pad_d + 1",
+                 f"{S}pl_x0 + {S}top_rim", f"{S}pl_y0 + {S}top_rim",
+                 f"{S}plate_t - {S}top_pad_d", parent=assy)
+
+# bottom silicone pockets: two per side of the T-slot
+bpads = []
+for i, (bx, by) in enumerate([("bp_x_a", "bp_y_hi"), ("bp_x_b", "bp_y_hi"),
+                              ("bp_x_a", "bp_y_lo"), ("bp_x_b", "bp_y_lo")]):
+    bpads.append(stadium(f"BotPad{i + 1}", S + "bp_L", S + "bp_W",
+                         f"{S}bot_pad_d + 0.5", S + bx, S + by, "-0.5",
+                         parent=assy))
+botpads = fuse("BottomPadPockets", bpads, parent=assy)
+
+camcut = stadium("CamWindow", f"{S}cam_Lx + 2 * {S}cam_clr",
+                 f"{S}cam_Wy + 2 * {S}cam_clr", f"{S}cam_h + 1",
+                 f"{S}cam_x - {S}cam_clr", f"{S}cam_y - {S}cam_clr",
+                 f"{S}plate_t - {S}cam_h - 0.5", parent=assy)
+
+mouth = box("Slot_mouth", S + "slot_len",
+            f"{S}nub_neck_w + 2 * {S}slot_clr", f"{S}nub_neck_h + 0.5",
+            S + "slot_x0", f"{S}rcv_y - {S}nub_neck_w / 2 - {S}slot_clr",
+            "-0.5", parent=assy)
+chamber = box("Slot_chamber", S + "slot_len",
+              f"{S}nub_cap_w + 2 * {S}slot_clr",
+              f"{S}nub_cap_h + {S}slot_clr",
+              S + "slot_x0", f"{S}rcv_y - {S}nub_cap_w / 2 - {S}slot_clr",
+              S + "nub_neck_h", parent=assy)
+tslot = fuse("TSlot", [mouth, chamber], parent=assy)
+
+p0 = cut("Plate_0", body, toppad, parent=assy)
+p1 = cut("Plate_1", p0, ringpocket, parent=assy)
+p2 = cut("Plate_2", p1, camcut, parent=assy)
+p3 = cut("Plate_3", p2, tslot, parent=assy)
+plate = cut("Plate", p3, botpads, parent=assy)
+
+ring_o = cyl("RingOD", f"{S}ring_od / 2", S + "ring_t",
+             S + "ring_x", S + "ring_y", S + "ring_z", parent=assy)
+ring_i = cyl("RingID", f"{S}ring_id / 2", f"{S}ring_t + 1",
+             S + "ring_x", S + "ring_y", f"{S}ring_z - 0.5", parent=assy)
+ring = cut("MagnetRing", ring_o, ring_i, parent=assy)
+
+# ---- phone in case (reference): sits on the plate top ----
+case = box("Fold8Case", S + "case_L", S + "case_W", S + "case_T",
+           "0", "0", S + "plate_t", parent=assy)
+bump = stadium("CameraBump", S + "cam_Lx", S + "cam_Wy", S + "cam_h",
+               S + "cam_x", S + "cam_y", f"{S}plate_t - {S}cam_h",
+               parent=assy)
+
+doc.recompute()
+
+if App.GuiUp:
+    import FreeCADGui as Gui
+    style = {
+        "Controller": ((0.25, 0.25, 0.28), 0),
+        "GripNub": ((0.9, 0.1, 0.1), 0),
+        "StockPuck": ((0.9, 0.5, 0.1), 50),
+        "StockPuckRing": ((0.9, 0.2, 0.2), 0),
+        "Plate": ((0.2, 0.6, 0.9), 0),
+        "MagnetRing": ((0.8, 0.1, 0.1), 0),
+        "Fold8Case": ((0.6, 0.6, 0.6), 70),
+        "CameraBump": ((0.1, 0.1, 0.1), 0),
+    }
+    for name, (color, transp) in style.items():
+        vo = doc.getObject(name).ViewObject
+        vo.ShapeColor = color
+        vo.Transparency = transp
+    for hidden in ("StockPuck", "StockPuckRing"):
+        doc.getObject(hidden).ViewObject.Visibility = False
+    Gui.activeDocument().activeView().viewIsometric()
+    Gui.SendMsgToActiveView("ViewFit")
+
+fm = getattr(sheet, "floor_margin")
+co = getattr(sheet, "cam_overlap_x")
+eh = getattr(sheet, "bp_edge_hi")
+el = getattr(sheet, "bp_edge_lo")
+App.Console.PrintMessage(
+    f"Rev 7 built. floor_margin = {fm} mm (keep >= ~0.8). "
+    f"cam_overlap_x = {co} mm. bottom pad edge margins: +y {eh}, -y {el} "
+    "(must be > 0; more near the rounded ends).\n")
