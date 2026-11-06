@@ -1,3 +1,8 @@
+`default_nettype none
+// Testbench-only: plain `always` (clock/monitors) and `===` (X-aware checks)
+// are correct here; these two rules target synthesizable RTL.
+/* svlint off keyword_forbidden_always */
+/* svlint off operator_case_equality */
 `timescale 1ns/1ps
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -37,8 +42,8 @@ module input_mapper_tb();
   logic       poll_tick  = 1'b0;
 
   // ── Outputs from DUT ──────────────────────────────────────────────────────
-  wire [7:0] pkt [0:4];
-  wire       pkt_valid;
+  logic [7:0] pkt [0:4];
+  logic       pkt_valid;
 
   // ── DUT instantiation ─────────────────────────────────────────────────────
   input_mapper dut (
@@ -59,18 +64,11 @@ module input_mapper_tb();
   // ── 50 MHz clock (20 ns period) ───────────────────────────────────────────
   always #10 clk = ~clk;
 
-  // ── Helper task: check one byte ───────────────────────────────────────────
-  task check_byte;
-    input [7:0]  got;
-    input [7:0]  expected;
-    input [47:0] label;   // 6-char packed string, e.g. "pkt[0]"
-    begin
-      if (got === expected)
-        $display("  PASS  %s  got 0x%02X", label, got);
-      else
-        $display("  FAIL  %s  got 0x%02X  expected 0x%02X", label, got, expected);
-    end
-  endtask
+  // ── Scoreboard: check()/check_byte()/report_and_finish() + watchdog ──────
+  // Whole run is ~200 ns; the watchdog fails the test at 10 us.
+  localparam string TB_NAME    = "input_mapper_tb";
+  localparam int    TIMEOUT_NS = 10_000;
+`include "testBenches/tb_checks.svh"
 
   // ── Stimulus ──────────────────────────────────────────────────────────────
   initial begin
@@ -129,21 +127,16 @@ module input_mapper_tb();
     poll_tick = 1'b1;
     @(posedge clk);
     #1;
-    if (pkt_valid === 1'b1)
-      $display("  PASS  pkt_valid high while poll_tick asserted");
-    else
-      $display("  FAIL  pkt_valid did not go high with poll_tick");
+    check(pkt_valid === 1'b1, "pkt_valid high while poll_tick asserted");
 
     poll_tick = 1'b0;
     @(posedge clk);
     #1;
-    if (pkt_valid === 1'b0)
-      $display("  PASS  pkt_valid returned low after poll_tick released");
-    else
-      $display("  FAIL  pkt_valid stuck high");
+    check(pkt_valid === 1'b0, "pkt_valid returned low after poll_tick released");
 
-    $display("\nDone.\n");
-    $finish;
+    report_and_finish();
   end
 
 endmodule
+
+`default_nettype wire

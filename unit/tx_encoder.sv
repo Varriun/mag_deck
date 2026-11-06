@@ -1,3 +1,4 @@
+`default_nettype none
 module tx_encoder (
   input  logic        clk,
   input  logic        rst_n,
@@ -86,3 +87,5 @@ module tx_encoder (
   end
 
 endmodule
+
+`default_nettype wire

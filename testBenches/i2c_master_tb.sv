@@ -1,3 +1,8 @@
+`default_nettype none
+// Testbench-only: plain `always` (clock/monitors) and `===` (X-aware checks)
+// are correct here; these two rules target synthesizable RTL.
+/* svlint off keyword_forbidden_always */
+/* svlint off operator_case_equality */
 `timescale 1ns/1ps
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -31,18 +36,18 @@ module i2c_master_tb();
   logic [7:0] reg_addr;
 
   // ── Outputs from DUT ──────────────────────────────────────────────────────
-  wire  [7:0] rx_data;
-  wire        rx_valid;
-  wire        i2c_scl;
+  logic [7:0] rx_data;
+  logic       rx_valid;
+  logic       i2c_scl;
 
   // ── Shared open-drain SDA bus ─────────────────────────────────────────────
   // Both the DUT and the target model pull SDA low or release it.
   // The wire resolves: if either drives low, bus is low.
-  wire        i2c_sda;
-
-  logic tgt_sda_out = 1'b1;
-  logic tgt_sda_oe  = 1'b0;
-  assign i2c_sda = (tgt_sda_oe && !tgt_sda_out) ? 1'b0 : 1'bz;
+  tri1     i2c_sda;
+  
+  logic   tgt_sda_out = 1'b1;
+  logic   tgt_sda_oe  = 1'b0;
+  assign  i2c_sda = (tgt_sda_oe && !tgt_sda_out) ? 1'b0 : 1'bz;
 
   // ── DUT instantiation ─────────────────────────────────────────────────────
   i2c_master dut (
@@ -59,6 +64,12 @@ module i2c_master_tb();
 
   // ── 50 MHz clock (20 ns period) ───────────────────────────────────────────
   always #10 clk = ~clk;
+
+  // ── Scoreboard: check()/check_byte()/report_and_finish() + watchdog ──────
+  // One read transaction is ~380 us; the watchdog fails the test at 2 ms.
+  localparam string TB_NAME    = "i2c_master_tb";
+  localparam int    TIMEOUT_NS = 2_000_000;
+`include "testBenches/tb_checks.svh"
 
   // ── Stimulus ──────────────────────────────────────────────────────────────
   initial begin
@@ -82,16 +93,22 @@ module i2c_master_tb();
 
     // Wait for master to finish and pulse rx_valid
     @(posedge rx_valid);
-    repeat(20) @(posedge clk);
+    #1;
+    check_byte(rx_data, 8'hA5, "rx_data at rx_valid");
 
-    $display("rx_data = 0x%02X (expected 0xA5)", rx_data);
-    if (rx_data === 8'hA5)
-      $display("PASS: received correct data byte.");
-    else
-      $display("FAIL: data mismatch.");
+    // rx_valid is a strobe: it must drop after exactly one clock
+    @(posedge clk); #1;
+    check(rx_valid === 1'b0, "rx_valid is a one-cycle pulse");
 
-    $finish;
+    // After STOP (one more bit period = 500 clocks) the master must release
+    // the bus: SCL high and SDA pulled high (nobody driving low).
+    repeat(600) @(posedge clk); #1;
+    check(i2c_scl === 1'b1 && i2c_sda === 1'b1,
+          $sformatf("bus idle after STOP (scl=%b sda=%b)", i2c_scl, i2c_sda));
+
+    report_and_finish();
   end
+  
 
   // ── Target (device) model ─────────────────────────────────────────────────
   // Behaves as a Cirque-style trackpad at address 0x2A.
@@ -173,3 +190,5 @@ module i2c_master_tb();
   end
 
 endmodule
+
+`default_nettype wire

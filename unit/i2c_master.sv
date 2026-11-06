@@ -1,3 +1,4 @@
+`default_nettype none
 `timescale 1ns / 1ps
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -29,7 +30,7 @@ module i2c_master (
   output logic [7:0] rx_data,    // byte received from the device
   output logic       rx_valid,   // pulses high for 1 cycle when rx_data is ready
   output logic       i2c_scl,
-  inout  wire        i2c_sda
+  inout  tri         i2c_sda
 );
 
   // ── 1. PHASE COUNTER (the prescaler / timing source) ─────────────────────
@@ -46,7 +47,7 @@ module i2c_master (
   // Because tick fires with the OLD phase value visible, a case on phase 0
   // executes its action and then phase becomes 1 on the very next cycle.
 
-  localparam CLK_DIV = 125;  // cycles per phase (125 x 4 phases = 500 = 50MHz/100kHz)
+  localparam int CLK_DIV = 125;  // cycles per phase (125 x 4 phases = 500 = 50MHz/100kHz)
 
   logic [6:0] clk_cnt;  // counts 0..CLK_DIV-1
   logic [1:0] phase;    // 0..3, wraps automatically (2-bit)
@@ -185,6 +186,7 @@ module i2c_master (
                 bit_cnt   <= 3'd7;
               end
               2'd3: state <= ADDR_W;
+              default: ;
             endcase
           end
         end
@@ -210,9 +212,11 @@ module i2c_master (
                 if (bit_cnt == 3'd0) begin
                   sda_oe <= 1'b0;                // release SDA so target can ACK
                   state  <= ACK_AW;
-                end else
+                end else begin
                   bit_cnt <= bit_cnt - 1'b1;
+                end
               end
+              default: ;
             endcase
           end
         end
@@ -233,6 +237,7 @@ module i2c_master (
                 sda_oe    <= 1'b1;                 // take back SDA
                 state     <= REG;
               end
+              default: ;
             endcase
           end
         end
@@ -254,9 +259,11 @@ module i2c_master (
                 if (bit_cnt == 3'd0) begin
                   sda_oe <= 1'b0;
                   state  <= ACK_REG;
-                end else
+                end else begin
                   bit_cnt <= bit_cnt - 1'b1;
+                end
               end
+              default: ;
             endcase
           end
         end
@@ -274,6 +281,7 @@ module i2c_master (
                 sda_oe  <= 1'b1;   // we own SDA again for the repeated-START
                 state   <= RSTART;
               end
+              default: ;
             endcase
           end
         end
@@ -301,6 +309,7 @@ module i2c_master (
                 bit_cnt   <= 3'd7;
                 state     <= ADDR_R;
               end
+              default: ;
             endcase
           end
         end
@@ -321,9 +330,11 @@ module i2c_master (
                 if (bit_cnt == 3'd0) begin
                   sda_oe <= 1'b0;            // release SDA: target will drive data
                   state  <= ACK_AR;
-                end else
+                end else begin
                   bit_cnt <= bit_cnt - 1'b1;
+                end
               end
+              default: ;
             endcase
           end
         end
@@ -342,6 +353,7 @@ module i2c_master (
                 // sda_oe stays 0 -- target continues to drive SDA with data bits
                 state   <= READ;
               end
+              default: ;
             endcase
           end
         end
@@ -362,9 +374,11 @@ module i2c_master (
                   sda_oe  <= 1'b1;   // take back SDA to send NACK
                   sda_out <= 1'b1;   // NACK = hold SDA HIGH during ACK slot
                   state   <= NACK;
-                end else
+                end else begin
                   bit_cnt <= bit_cnt - 1'b1;
+                end
               end
+              default: ;
             endcase
           end
         end
@@ -385,6 +399,7 @@ module i2c_master (
                 sda_out  <= 1'b0;             // SDA low before STOP SCL rise
                 state    <= STOP;
               end
+              default: ;
             endcase
           end
         end
@@ -405,6 +420,7 @@ module i2c_master (
                 sda_oe <= 1'b0;               // release bus, done
                 state  <= IDLE;
               end
+              default: ;
             endcase
           end
         end
@@ -416,3 +432,5 @@ module i2c_master (
   end
 
 endmodule
+
+`default_nettype wire

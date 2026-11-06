@@ -1,3 +1,8 @@
+`default_nettype none
+// Testbench-only: plain `always` (clock/monitors) and `===` (X-aware checks)
+// are correct here; these two rules target synthesizable RTL.
+/* svlint off keyword_forbidden_always */
+/* svlint off operator_case_equality */
 `timescale 1ns/1ps
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -31,8 +36,8 @@ module tx_encoder_tb();
   logic       tx_busy   = 1'b0;   // driven by the uart_tx model below
 
   // ── Outputs from DUT ──────────────────────────────────────────────────────
-  wire  [7:0] tx_byte;
-  wire        tx_start;
+  logic [7:0] tx_byte;
+  logic       tx_start;
 
   // ── DUT instantiation ─────────────────────────────────────────────────────
   tx_encoder dut (
@@ -52,7 +57,7 @@ module tx_encoder_tb();
   //
   // Real uart_tx would take ~4340 cycles at 115200 baud / 50 MHz.
   // Using 10 cycles here — enough to exercise the WAIT logic without a long sim.
-  localparam BUSY_CYCLES = 10;
+  localparam int BUSY_CYCLES = 10;
   logic [3:0] busy_cnt = '0;
 
   always_ff @(posedge clk or negedge rst_n) begin
@@ -64,25 +69,19 @@ module tx_encoder_tb();
       tx_busy  <= 1'b1;
       busy_cnt <= '0;
     end else if (tx_busy) begin
-      if (busy_cnt == BUSY_CYCLES - 1)
+      if (busy_cnt == BUSY_CYCLES - 1) begin
         tx_busy <= 1'b0;          // transmission done, release the line
-      else
+      end else begin
         busy_cnt <= busy_cnt + 1'b1;
+      end
     end
   end
 
-  // ── Helper task ───────────────────────────────────────────────────────────
-  task check_byte;
-    input [7:0]  got;
-    input [7:0]  expected;
-    input [47:0] label;
-    begin
-      if (got === expected)
-        $display("  PASS  %s  got 0x%02X", label, got);
-      else
-        $display("  FAIL  %s  got 0x%02X  expected 0x%02X", label, got, expected);
-    end
-  endtask
+  // ── Scoreboard: check()/check_byte()/report_and_finish() + watchdog ──────
+  // Whole run is ~1.5 us; the watchdog fails the test at 100 us.
+  localparam string TB_NAME    = "tx_encoder_tb";
+  localparam int    TIMEOUT_NS = 100_000;
+`include "testBenches/tb_checks.svh"
 
   // ── Stimulus ──────────────────────────────────────────────────────────────
   initial begin
@@ -137,13 +136,11 @@ module tx_encoder_tb();
     repeat(BUSY_CYCLES + 5) @(posedge clk);
     #1;
     $display("\n── IDLE check ──");
-    if (tx_start === 1'b0)
-      $display("  PASS  tx_start low after packet complete — FSM in IDLE");
-    else
-      $display("  FAIL  tx_start still high — FSM did not return to IDLE");
+    check(tx_start === 1'b0, "tx_start low after packet complete — FSM in IDLE");
 
-    $display("\nDone.\n");
-    $finish;
+    report_and_finish();
   end
 
 endmodule
+
+`default_nettype wire

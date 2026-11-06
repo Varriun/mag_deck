@@ -1,5 +1,6 @@
+`default_nettype none
 module debounce #(
-    parameter THRESHOLD = 50000
+    parameter int THRESHOLD = 50000
 )(
     input  logic clk,
     input  logic rst_n,
@@ -53,3 +54,5 @@ module debounce #(
     end
 
 endmodule
+
+`default_nettype wire

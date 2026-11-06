@@ -1,3 +1,4 @@
+`default_nettype none
 module mag_deck_core (
   input logic clk,
   input logic rst_n,
@@ -12,12 +13,12 @@ module mag_deck_core (
   // Analog Trackpad Interface (external ADC)
   // 1st Trackpad Interface (I2C)
   output logic i2c_scl_1,
-  inout  wire  i2c_sda_1,
+  inout  tri   i2c_sda_1,
   
   //2nd Trackpad interface
   //note: maybe I should give slightly different names like i2c_scl_2?
   output logic i2c_scl_2,
-  inout  wire  i2c_sda_2,
+  inout  tri   i2c_sda_2,
 
   // Output to phone
   output logic tx_pin
@@ -35,41 +36,34 @@ module mag_deck_core (
 
   // ── Debounce instances ─────────────────────────────────────────
   // face_btn[3:0] — 4 instances via generate
-  genvar i;
-  generate
-    for (i = 0; i < 4; i = i + 1) begin : gen_face_db
-      debounce #(.THRESHOLD(50000)) db_face (
-        .clk   (clk),
-        .rst_n (rst_n),
-        .sw_in (face_btn[i]),
-        .sw_out(clean_face_btn[i])
-      );
-    end
-  endgenerate
+  for (genvar i = 0; i < 4; i++) begin : gen_face_db
+    debounce #(.THRESHOLD(50000)) db_face (
+      .clk   (clk),
+      .rst_n (rst_n),
+      .sw_in (face_btn[i]),
+      .sw_out(clean_face_btn[i])
+    );
+  end
 
   // dpad[3:0] — 4 instances
-  generate 
-    for (i = 0; i < 4; i = i + 1) begin : gen_dpad_db
-      debounce #(.THRESHOLD(50000)) db_dpad (
-        .clk   (clk),
-        .rst_n (rst_n),
-        .sw_in (dpad[i]),
-        .sw_out(clean_dpad[i])
-      );
-    end
-  endgenerate
+  for (genvar i = 0; i < 4; i++) begin : gen_dpad_db
+    debounce #(.THRESHOLD(50000)) db_dpad (
+      .clk   (clk),
+      .rst_n (rst_n),
+      .sw_in (dpad[i]),
+      .sw_out(clean_dpad[i])
+    );
+  end
 
   // bumpers[1:0] — 2 instances
-  generate
-    for (i = 0; i < 2; i = i + 1) begin : gen_bumper_db
-      debounce #(.THRESHOLD(50000)) db_bumper (
-        .clk   (clk),
-        .rst_n (rst_n),
-        .sw_in (bumpers[i]),
-        .sw_out(clean_bumper[i])
-      );
-    end
-  endgenerate
+  for (genvar i = 0; i < 2; i++) begin : gen_bumper_db
+    debounce #(.THRESHOLD(50000)) db_bumper (
+      .clk   (clk),
+      .rst_n (rst_n),
+      .sw_in (bumpers[i]),
+      .sw_out(clean_bumper[i])
+    );
+  end
 
   // start_btn — single instance
   debounce #(.THRESHOLD(50000)) db_start (
@@ -177,7 +171,7 @@ module mag_deck_core (
     end
   end
   // ── Parallel logic: I2C polling section ───────────────────────────────────────────
-  localparam POLL_DIV = 500_000;
+  localparam int POLL_DIV = 500_000;
 
   assign poll_tick = (poll_cnt == POLL_DIV -1);
 
@@ -198,3 +192,5 @@ module mag_deck_core (
     end 
   end
 endmodule
+
+`default_nettype wire

@@ -1,3 +1,4 @@
+`default_nettype none
 module input_mapper (
   input  logic        clk,
   input  logic        rst_n,
@@ -21,7 +22,7 @@ module input_mapper (
   output logic        pkt_valid
 );
 
-  localparam SYNC = 8'hAA;
+  localparam bit [7:0] SYNC = 8'hAA;
 
   // ── Packet assembly ───────────────────────────────────────────────────────
   //
@@ -64,3 +65,5 @@ module input_mapper (
 
 
 endmodule
+
+`default_nettype wire

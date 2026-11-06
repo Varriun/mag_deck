@@ -1,3 +1,4 @@
+`default_nettype none
 module uart_tx(
   input logic       clk,
   input logic       rst_n,
@@ -15,9 +16,9 @@ state_t state;
 logic [3:0] bit_cnt;
 logic [8:0] baud_cnt;
 
-localparam CLK_FREQ = 50_000_000;
-localparam BAUD_RATE = 115_200;
-localparam DIVISOR = CLK_FREQ/BAUD_RATE;
+localparam int CLK_FREQ = 50_000_000;
+localparam int BAUD_RATE = 115_200;
+localparam int DIVISOR = CLK_FREQ/BAUD_RATE;
 
 always_ff @(posedge clk or negedge rst_n) begin
   if(!rst_n)begin
@@ -75,3 +76,5 @@ always_ff @(posedge clk or negedge rst_n) begin
   end
 end
 endmodule
+
+`default_nettype wire
